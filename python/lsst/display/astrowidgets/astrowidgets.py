@@ -89,7 +89,6 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._canvas = self._viewer.canvas
         self._canvas.enable_draw(False)
         self._maskTransparency = 0.8
-        self._maskTransparencyAlpha = 0.8
         self._redraw = True
 
     def embed(self):
@@ -160,7 +159,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
                     maskDict[1 << bit] = color
             # CZW: This value of 0.9 is pretty thick for the alpha.
             self.overlay_mask(mask, maskDict,
-                              self._maskTransparencyAlpha)
+                              self._maskTransparency)
         self._flush()
 
     def overlay_mask(self, maskImage, maskDict, maskAlpha):
@@ -186,7 +185,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             nSet[isSet] += 1
 
         maskRGBA[:, :, 3][nSet == 0] = 0
-        maskRGBA[:, :, 3][nSet != 0] = 255 * maskAlpha
+        maskRGBA[:, :, 3][nSet != 0] = 255 * (1 - maskAlpha)
 
         nSet[nSet == 0] = 1
         for C in (0, 1, 2):
