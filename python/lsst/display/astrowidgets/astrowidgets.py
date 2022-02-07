@@ -128,6 +128,9 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         Aimage = AstroImage(inherit_primary_header=True)
         Aimage.set_data(image.getArray())
 
+        if "mask_overlay" in self._gingaViewer.canvas.get_tags():
+            self._gingaViewer.canvas.delete_object_by_tag("mask_overlay")
+
         self._gingaViewer.set_image(Aimage)
 
         if wcs is not None:
