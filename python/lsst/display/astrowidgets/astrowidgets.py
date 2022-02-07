@@ -209,6 +209,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
     def _erase(self):
         """Erase the display"""
         self._canvas.delete_all_objects()
+        self._viewer.reset_markers()
 
     def _dot(self, symb, c, r, size, ctype, fontFamily="helvetica", textAngle=None, label='_dot'):
         """Draw a symbol at (col,row) = (c,r) [0-based coordinates]
