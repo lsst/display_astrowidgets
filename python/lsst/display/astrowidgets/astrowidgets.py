@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Ds9Error", "DisplayImpl"]
+__all__ = ["AstroWidgetsVersion", "DisplayImpl"]
 
 import sys
 from astropy.table import Table
@@ -34,12 +34,6 @@ from ginga.AstroImage import AstroImage
 from ginga.util.wcsmod.wcs_astropy import AstropyWCS
 
 import astrowidgets
-
-
-class Ds9Error(IOError):
-    """Represents an error communicating with Astrowidgets
-    """
-
 
 try:
     _maskTransparency
