@@ -285,7 +285,6 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             self._viewer.reset_markers()
 
     def linkMarkers(self, ctype='brown', label='interactive'):
-        # I don't have a good way to clear these.
         Line = self._gingaViewer.canvas.get_draw_class('line')
         table = self._viewer.get_markers(marker_name=label)
 
@@ -295,6 +294,9 @@ class DisplayImpl(virtualDevice.DisplayImpl):
                 self._gingaViewer.canvas.add(Line(x0, y0, x, y, color=ctype), redraw=self._redraw)
             x0 = x
             y0 = y
+
+    def clearLines(self):
+        self._gingaViewer.canvas.deleteObjects(list(self._gingaViewer.canvas.get_objects_by_kind('line')))
 
     #
     # Set gray scale
