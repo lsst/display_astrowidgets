@@ -83,7 +83,6 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._canvas = self._viewer.canvas
         self._canvas.enable_draw(False)
         self._maskTransparency = 0.8
-        self._maskTransparencyAlpha = 0.8
         self._redraw = True
 
     def embed(self):
@@ -102,7 +101,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         """Show (or hide) the colour bar"""
         self._gingaViewer.show_pan_mark(show, color)
 
-    def _setMaskTransparency(self, transparency, maskplane):
+    def _setMaskTransparency(self, transparency, maskplane=None):
         """Specify mask transparency (percent); or None to not set it when loading masks"""
         if maskplane is not None:
             print("display_astrowidgets is not yet able to set transparency for individual maskplanes" % maskplane,  # noqa E501
@@ -119,7 +118,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         """Display an Image and/or Mask on a ginga display"""
         self._erase()
         self._canvas.delete_all_objects()
-
+        self._buffer()
         Aimage = AstroImage(inherit_primary_header=True)
         Aimage.set_data(image.getArray())
 
@@ -154,7 +153,8 @@ class DisplayImpl(virtualDevice.DisplayImpl):
                     maskDict[1 << bit] = color
             # CZW: This value of 0.9 is pretty thick for the alpha.
             self.overlay_mask(mask, maskDict,
-                              self._maskTransparencyAlpha)
+                              self._maskTransparency)
+        self._buffer(enable=False)
         self._flush()
 
     def overlay_mask(self, maskImage, maskDict, maskAlpha):
