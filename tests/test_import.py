@@ -14,7 +14,6 @@ class ImportTest(unittest.TestCase):
             self.assertTrue(hasattr(displayAstrowidgets, "AstroWidgetsVersion"))
 
 
-
 class TestMemory(lsst.utils.tests.MemoryTestCase):
     pass
 
