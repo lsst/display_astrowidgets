@@ -1,4 +1,4 @@
-# This file is part of display_ds9.
+# This file is part of display_astrowidgets.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Ds9Error", "DisplayImpl"]
+__all__ = ["AstroWidgetsVersion", "DisplayImpl"]
 
 import sys
 from astropy.table import Table
@@ -34,12 +34,6 @@ from ginga.AstroImage import AstroImage
 from ginga.util.wcsmod.wcs_astropy import AstropyWCS
 
 import astrowidgets
-
-
-class Ds9Error(IOError):
-    """Represents an error communicating with Astrowidgets
-    """
-
 
 try:
     _maskTransparency
@@ -67,6 +61,17 @@ class AstroWidgetsEvent(interface.Event):
 
 class DisplayImpl(virtualDevice.DisplayImpl):
     """Virtual device display implementation.
+
+    Parameters
+    ----------
+    display : `lsst.afw.display.virtualDevice.DisplayImpl`
+        Display object to connect to.
+    dims : `tuple` [`int`, `int`], optional
+        Dimensions of the viewer window.
+    use_opencv : `bool`, optional
+        Should openCV be used to speed drawing?
+    verbose : `bool`, optional
+        Increase log verbosity?
     """
     markerDict = {'+': 'plus', 'x': 'cross', '.': 'circle', '*': 'circle', 'o': 'circle'}
 
@@ -82,34 +87,57 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._defaultMarkTagName = 'all'
         self._callbackDict = dict()
 
-        self._gingaViewer = self._viewer._viewer  # We want to display the IW, but ginga has all the handles
+        # We want to display the IW, but ginga has all the handles
+        self._gingaViewer = self._viewer._viewer
 
         bd = self._gingaViewer.get_bindings()
         bd.enable_all(True)
         self._canvas = self._viewer.canvas
         self._canvas.enable_draw(False)
         self._maskTransparency = 0.8
-        self._maskTransparencyAlpha = 0.8
         self._redraw = True
 
     def embed(self):
         """Attach this display to the output of the current cell."""
-        return self._viewer  # .embed()
+        return self._viewer
 
     def get_viewer(self):
         """Return the ginga viewer"""
         return self._viewer
 
     def show_color_bar(self, show=True):
-        """Show (or hide) the colour bar"""
+        """Show (or hide) the colour bar.
+
+        Parameters
+        ----------
+        show : `bool`, optional
+            Should the color bar be shown?
+        """
         self._gingaViewer.show_color_bar(show)
 
     def show_pan_mark(self, show=True, color='red'):
-        """Show (or hide) the colour bar"""
+        """Show (or hide) the pan mark.
+
+        Parameters
+        ----------
+        show : `bool`, optional
+            Should the pan marker be shown?
+        color : `str`, optional
+            What color should the pan mark be?
+        """
         self._gingaViewer.show_pan_mark(show, color)
 
-    def _setMaskTransparency(self, transparency, maskplane):
-        """Specify mask transparency (percent); or None to not set it when loading masks"""
+    def _setMaskTransparency(self, transparency, maskplane=None):
+        """Specify mask transparency (percent); or None to not set it when loading masks.
+
+        Parameters
+        ----------
+        transparency : `float`
+            Transparency of the masks in percent (0-100).
+        maskplane : `str`, optional
+             Unsupported option to only change the transparency of
+            certain masks.
+        """
         if maskplane is not None:
             print("display_astrowidgets is not yet able to set transparency for individual maskplanes" % maskplane,  # noqa E501
                   file=sys.stderr)
@@ -118,14 +146,26 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._maskTransparency = 0.01*transparency
 
     def _getMaskTransparency(self, maskplane=None):
-        """Return the current mask transparency"""
+        """Return the current mask transparency."""
         return self._maskTransparency
 
     def _mtv(self, image, mask=None, wcs=None, title=""):
-        """Display an Image and/or Mask on a ginga display"""
+        """Display an Image and/or Mask on a ginga display
+
+        Parameters
+        ----------
+        image : `lsst.afw.image.Image` or `lsst.afw.image.Exposure`
+            Image to display.
+        mask : `lsst.afw.image.Mask`, optional
+            Mask to use, if the input does not contain one.
+        wcs : `ginga.util.wcsmod.wcs_astropy`
+            WCS to use, if the input does not contain one.
+        title : `str`, optional
+            Unsupported display title.
+        """
         self._erase()
         self._canvas.delete_all_objects()
-
+        self._buffer()
         Aimage = AstroImage(inherit_primary_header=True)
         Aimage.set_data(image.getArray())
 
@@ -158,12 +198,24 @@ class DisplayImpl(virtualDevice.DisplayImpl):
                 color = maskColorFromName.get(plane, None)
                 if color:
                     maskDict[1 << bit] = color
-            # CZW: This value of 0.9 is pretty thick for the alpha.
+            # This value of 0.9 is pretty thick for the alpha.
             self.overlay_mask(mask, maskDict,
-                              self._maskTransparencyAlpha)
+                              self._maskTransparency)
+        self._buffer(enable=False)
         self._flush()
 
     def overlay_mask(self, maskImage, maskDict, maskAlpha):
+        """Draw mask onto the image display.
+
+        Parameters
+        ----------
+        maskImage : `lsst.afw.image.Mask`
+            Mask to display.
+        maskDict : `dict` [`str`, `str`]
+            Dictionary of mask plane names to colors.
+        maskAlpha : `float`
+            Transparency to display the mask.
+        """
         import numpy as np
         from ginga.RGBImage import RGBImage
         from ginga import colors
@@ -211,31 +263,30 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._canvas.delete_all_objects()
 
     def _dot(self, symb, c, r, size, ctype, fontFamily="helvetica", textAngle=None, label='_dot'):
-        """Draw a symbol at (col,row) = (c,r) [0-based coordinates]
-        Possible values are:
-            +                Draw a +
-            x                Draw an x
-            *                Draw a *
-            o                Draw a circle
-            @:Mxx,Mxy,Myy    Draw an ellipse with moments (Mxx, Mxy, Myy) (argument size is ignored)
-            An object derived from afwGeom.ellipses.BaseCore Draw the ellipse (argument size is ignored)
-            Any other value is interpreted as a string to be drawn. Strings
-            obey the fontFamily (which may be extended with other
-            characteristics, e.g. "times bold italic".  Text will be drawn
-            rotated by textAngle (textAngle is ignored otherwise).
-        N.b. objects derived from BaseCore include Axes and Quadrupole.
+        """Draw a symbol at (col,row) = (c,r) [0-based coordinates].
+
+        Parameters
+        ----------
+        symb : `str`
+            Symbol to draw.  Should be one of '+', 'x', '*', 'o', '.'.
+        c : `int`
+            Image column for dot center (0-based coordinates).
+        r : `int`
+            Image row for dot center (0-based coordinate).
+        size : `int`
+            Size of dot.
+        fontFamily : `str`, optional
+            Font to use for text symbols.
+        textAngle : `float`, optional
+            Text rotation angle.
+        label : `str`, optional
+            Label to store this dot in the internal list.
         """
         dataTable = Table([{'x': c, 'y': r}])
         if symb in '+x*.o':
             self._viewer.marker = {'type': self.markerDict[symb], 'color': ctype, 'radius': size}
             self._viewer.add_markers(dataTable, marker_name=label)
             self._flush()
-        # if isinstance(symb, afwGeom.ellipses.BaseCore):
-        #     Ellipse = self._canvas.get_draw_class('ellipse')
-
-        #     self._canvas.add(Ellipse(c, r, xradius=symb.getA(), yradius=symb.getB(),
-        #                              rot_deg=math.degrees(symb.getTheta()), color=ctype),
-        #                      redraw=self._redraw)
         else:
             Line = self._canvas.get_draw_class('line')
             Text = self._canvas.get_draw_class('text')
@@ -255,11 +306,17 @@ class DisplayImpl(virtualDevice.DisplayImpl):
                 else:
                     raise RuntimeError(ds9Cmd)
                 if comment:
-                    print(comment)  # CZW
+                    print(comment)
 
     def _drawLines(self, points, ctype):
-        """Connect the points, a list of (col,row)
-        Ctype is the name of a colour (e.g. 'red')
+        """Connect the points, a list of (col,row).
+
+        Parameters
+        ----------
+        points : `list` [`tuple` [`int`, `int`]]
+            Points to connect with lines.
+        ctype : `str`
+            Color to use.
         """
         Line = self._gingaViewer.canvas.get_draw_class('line')
         p0 = points[0]
@@ -268,24 +325,65 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             p0 = p
 
     def beginMarking(self, symb='+', ctype='cyan', size=10, label='interactive'):
+        """Begin interactive mark adding.
+
+        Parameters
+        ----------
+        symb : `str`, optional
+            Symbol to use.  Should be one of '+', 'x', '*', 'o', '.'.
+        ctype : `str`, optional
+            Color of markers.
+        size : `float`, optional
+            Size of marker.
+        label : `str`
+            Label to store this marker in the internal list.
+        """
         self._viewer.start_marking(marker_name=label,
                                    marker={'type': self.markerDict[symb], 'color': ctype, 'radius': size})
 
     def endMarking(self):
+        """End interactive mark adding."""
         self._viewer.stop_marking()
 
     def getMarkers(self, label='interactive'):
-        # This could do marker labels better.
+        """Get list of markers.
+
+        Parameters
+        ----------
+        label : `str`, optional
+            Marker label to return.
+
+        Returns
+        -------
+        table : `astropy.table.Table`
+            Table of markers with the given label.
+        """
         return self._viewer.get_markers(marker_name=label)
 
     def clearMarkers(self, label=None):
+        """Clear markers.
+
+        Parameters
+        ----------
+        label : `str`, optional
+            Marker label to clear.  If None, all markers are cleared.
+        """
         if label:
             self._viewer.remove_markers(label)
         else:
             self._viewer.reset_markers()
 
     def linkMarkers(self, ctype='brown', label='interactive'):
-        # I don't have a good way to clear these.
+        """Connect markers with lines.
+
+        Parameters
+        ----------
+        ctype : `str`, optional
+            Color to draw the lines.
+        label : `str`, optional
+            Marker label to connect.  Lines are drawn in the order
+            found in the table.
+        """
         Line = self._gingaViewer.canvas.get_draw_class('line')
         table = self._viewer.get_markers(marker_name=label)
 
@@ -296,10 +394,24 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             x0 = x
             y0 = y
 
-    #
-    # Set gray scale
-    #
+    def clearLines(self):
+        """Remove all lines from the display."""
+        self._gingaViewer.canvas.deleteObjects(list(self._gingaViewer.canvas.get_objects_by_kind('line')))
+
     def _scale(self, algorithm, min, max, unit, *args, **kwargs):
+        """Set greyscale values.
+
+        Parameters
+        ----------
+        algorithm : `str`
+            Image scaling algorithm to use.
+        min : `float` or `str`
+            Minimum value to set to black.  If a string, should be one of 'zscale' or 'minmax'.
+        max : `float`
+            Maximum value to set to white.
+        unit : `str`
+            Scaling units.  This is ignored.
+        """
         self._gingaViewer.set_color_map('gray')
         self._gingaViewer.set_color_algorithm(algorithm)
 
@@ -316,10 +428,12 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             self._gingaViewer.cut_levels(min, max)
 
     def _show(self):
-        """Show the requested display
-        In this case, embed it in the notebook (equivalent to Display.get_viewer().show();
-        see also Display.get_viewer().embed()
-        N.b.  These command *must* be the last entry in their cell
+        """Show the requested display.
+
+        In this case, embed it in the notebook (equivalent to
+        Display.get_viewer().show(); see also
+        Display.get_viewer().embed() N.b.  These command *must* be the
+        last entry in their cell
         """
         return self._gingaViewer.show()
 
@@ -327,11 +441,25 @@ class DisplayImpl(virtualDevice.DisplayImpl):
     # Zoom and Pan
     #
     def _zoom(self, zoomfac):
-        """Zoom by specified amount"""
+        """Zoom by specified amount
+
+        Parameters
+        ----------
+        zoomfac : `float`
+            Zoom factor to use.
+        """
         self._gingaViewer.scale_to(zoomfac, zoomfac)
 
     def _pan(self, colc, rowc):
-        """Pan to (colc, rowc)"""
+        """Pan to (colc, rowc)
+
+        Parameters
+        ----------
+        colc : `int`
+            Column to center in viewer (0-based coordinate).
+        rowc : `int`
+            Row to center in viewer (0-based coordinate).
+        """
         self._gingaViewer.set_pan(colc, rowc)
 
     def _getEvent(self):
@@ -350,22 +478,75 @@ class WcsAdaptorForGinga(AstropyWCS):
     """A class to adapt the LSST Wcs class for Ginga.
 
     This was taken largely from the afw.display.ginga package.
+
+    Parameters
+    ----------
+    wcs : `ginga.util.wcsmod.wcs_astropy`
+        WCS to adapt for Ginga.
     """
     def __init__(self, wcs):
         self._wcs = wcs
 
     def pixtoradec(self, idxs, coords='data'):
-        """Return (ra, dec) in degrees given a position in pixels"""
+        """Return (ra, dec) in degrees given a position in pixels.
+
+        Parameters
+        ----------
+        idxs : `list` [`tuple` [`float`, `float`]]
+            Pixel locations to convert.
+        coords  : `str`, optional
+            This parameter is ignored.
+        Returns
+        -------
+        ra : `list`
+            RA position in degrees.
+        dec : `list`
+            DEC position in degrees.
+        """
         ra, dec = self._wcs.pixelToSky(*idxs)
 
         return ra.asDegrees(), dec.asDegrees()
 
     def pixtosystem(self, idxs, system=None, coords='data'):
-        """I'm not sure if ginga really needs this; equivalent to self.pixtoradec()"""
+        """Return (ra, dec) in degrees given a position in pixels.
+
+        Parameters
+        ----------
+        idxs : `list` [`tuple` [`float`, `float`]]
+            Pixel locations to convert.
+        system : `str`, optional
+            This parameter is ignored.
+        coords : `str`, optional
+            This parameter is ignored.
+
+        Returns
+        -------
+        ra : `list`
+            RA position in degrees.
+        dec : `list`
+            DEC position in degrees.
+        """
         return self.pixtoradec(idxs, coords=coords)
 
     def radectopix(self, ra_deg, dec_deg, coords='data', naxispath=None):
-        """Return (x, y) in pixels given (ra, dec) in degrees"""
+        """Return (x, y) in pixels given (ra, dec) in degrees
+
+        Parameters
+        ----------
+        ra_deg : `list` [`float`]
+            RA position in degrees.
+        dec_deg : `list` [`float`]
+            DEC position in degrees.
+        coords : `str`, optional
+            This parameter is ignored.
+        naxispath : `str`, optional
+            This parameter is ignored.
+
+        Returns
+        -------
+        out : `tuple` [`list` [`float, `float`]]
+            Image coordates for input positions.
+        """
         return self._wcs.skyToPixel(ra_deg*afwGeom.degrees, dec_deg*afwGeom.degrees)
 
     def all_pix2world(self, *args, **kwargs):

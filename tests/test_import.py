@@ -1,12 +1,17 @@
 import unittest
 
 import lsst.utils.tests
-import lsst.display.astrowidgets
+try:
+    import lsst.display.astrowidgets as displayAstrowidgets
+except ImportError:
+    displayAstrowidgets = None
+    pass
 
 
 class ImportTest(unittest.TestCase):
     def testImport(self):
-        self.assertTrue(hasattr(lsst.display.astrowidgets, "Ds9Error"))
+        if displayAstrowidgets is not None:
+            self.assertTrue(hasattr(displayAstrowidgets, "AstroWidgetsVersion"))
 
 
 class TestMemory(lsst.utils.tests.MemoryTestCase):
