@@ -1,6 +1,6 @@
-#################################
+##########################################
 display_astrowidgets documentation preview
-#################################
+##########################################
 
 .. This page is for local development only. It isn't published to pipelines.lsst.io.
 

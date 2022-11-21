@@ -29,11 +29,30 @@ import lsst.afw.display.virtualDevice as virtualDevice
 import lsst.afw.display.ds9Regions as ds9Regions
 import lsst.afw.geom as afwGeom
 
-from ginga.misc.log import get_logger
-from ginga.AstroImage import AstroImage
-from ginga.util.wcsmod.wcs_astropy import AstropyWCS
+try:
+    from ginga.misc.log import get_logger
+    from ginga.AstroImage import AstroImage
+    from ginga.util.wcsmod.wcs_astropy import AstropyWCS
+    haveGinga = True
+except ImportError:
+    import logging
+    logging.getLogger("lsst.afw.display.astrowidgets").warning("Cannot import ginga libraries.")
 
-import astrowidgets
+    class AstropyWCS:
+        def skyToPixel(*args, **kwargs):
+            pass
+
+        def pixelToSky(*args, **kwargs):
+            pass
+
+    haveGinga = False
+
+
+try:
+    import astrowidgets
+    haveAstrowidgets = True
+except ImportError:
+    haveAstrowidgets = False
 
 try:
     _maskTransparency
@@ -81,7 +100,10 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             width, height = 1024, 768
         else:
             width, height = dims
-        self.logger = get_logger("ginga", log_stderr=True, level=40)
+        if haveGinga:
+            self.logger = get_logger("ginga", log_stderr=True, level=40)
+        else:
+            self.logger = None
         self._viewer = astrowidgets.ImageWidget(image_width=width, image_height=height,
                                                 use_opencv=use_opencv, logger=self.logger)
         self._defaultMarkTagName = 'all'
@@ -166,20 +188,22 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._erase()
         self._canvas.delete_all_objects()
         self._buffer()
-        Aimage = AstroImage(inherit_primary_header=True)
-        Aimage.set_data(image.getArray())
+        if haveGinga:
+            Aimage = AstroImage(inherit_primary_header=True)
+            Aimage.set_data(image.getArray())
 
-        self._gingaViewer.set_image(Aimage)
+            self._gingaViewer.set_image(Aimage)
 
         if wcs is not None:
-            _wcs = AstropyWCS(self.logger)
-            Aimage.lsst_wcs = WcsAdaptorForGinga(wcs)
-            _wcs.pixtoradec = Aimage.lsst_wcs.pixtoradec
-            _wcs.pixtosystem = Aimage.lsst_wcs.pixtosystem
-            _wcs.radectopix = Aimage.lsst_wcs.radectopix
+            if haveGinga:
+                _wcs = AstropyWCS(self.logger)
+                Aimage.lsst_wcs = WcsAdaptorForGinga(wcs)
+                _wcs.pixtoradec = Aimage.lsst_wcs.pixtoradec
+                _wcs.pixtosystem = Aimage.lsst_wcs.pixtosystem
+                _wcs.radectopix = Aimage.lsst_wcs.radectopix
 
-            Aimage.set_wcs(_wcs)
-            Aimage.wcs.wcs = Aimage.lsst_wcs
+                Aimage.set_wcs(_wcs)
+                Aimage.wcs.wcs = Aimage.lsst_wcs
 
         if mask:
             maskColorFromName = {'BAD': 'red',
