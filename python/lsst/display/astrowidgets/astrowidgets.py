@@ -35,6 +35,9 @@ try:
     from ginga.util.wcsmod.wcs_astropy import AstropyWCS
     haveGinga = True
 except ImportError:
+    import logging
+    logging.getLogger("lsst.afw.display.astrowidgets").warning("Cannot import ginga libraries.")
+
     class AstropyWCS:
         def skyToPixel(*args, **kwargs):
             pass

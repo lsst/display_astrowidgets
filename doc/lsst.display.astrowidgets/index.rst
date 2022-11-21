@@ -36,7 +36,7 @@ You can find Jira issues for this module under the `display_astrowidgets <https:
 Python API reference
 ====================
 
-.. automodapi:: lsst.ip.isr
+.. automodapi:: lsst.display.astrowidgets
    :no-main-docstr:
    :no-inheritance-diagram:
 
