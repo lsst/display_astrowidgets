@@ -16,7 +16,7 @@ Using lsst.display.astrowidgets
 .. toctree::
    :maxdepth: 1
 
-``lsst.display.astrowidgets`` can be used by calling  ``lsst.afw.display.setDefaultBackend("astrowidgets")``.  The included example notebook illustrates the python API, as well as the interactive features (which have fragile dependencies, and may often break).
+``lsst.display.astrowidgets`` can be used by calling  ``lsst.afw.display.setDefaultBackend("astrowidgets")``.  The included `example notebook </static/lsst.display.astrowidgets/display_astrowidgets.ipynb`_ illustrates the python API, as well as the interactive features (which have fragile dependencies, and may often break).
 
 .. _lsst.display.astrowidgets-contributing:
 
