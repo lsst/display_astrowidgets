@@ -1,3 +1,4 @@
+_build*
 .sconsign.dblite
 config.log
 .cache
@@ -22,3 +23,4 @@ bin/
 .pytest_cache
 pytest_session.txt
 python/lsst/display/astrowidgets/version.py
+python/*.dist-info/
