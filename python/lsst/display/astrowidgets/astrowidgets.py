@@ -178,9 +178,9 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         wcs : `ginga.util.wcsmod.wcs_astropy`
             WCS to use, if the input does not contain one.
         title : `str`, optional
-            Unsupported display title.
+            Title that will be stored in OBJECT header of FITS file.
         metadata : `lsst.daf.base.PropertyList`, optional
-            Unsupported FITS header information.
+            FITS header information that might be used.
         """
         self._erase()
         self._canvas.delete_all_objects()
