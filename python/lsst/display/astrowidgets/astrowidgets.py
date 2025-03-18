@@ -22,29 +22,24 @@
 __all__ = ["AstroWidgetsVersion", "DisplayImpl"]
 
 import sys
+import tempfile
+import warnings
 from astropy.table import Table
+from astropy.io.fits.verify import VerifyWarning
+from astropy.wcs import FITSFixedWarning
 
 import lsst.afw.display.interface as interface
 import lsst.afw.display.virtualDevice as virtualDevice
 import lsst.afw.display.ds9Regions as ds9Regions
-import lsst.afw.geom as afwGeom
+from lsst.afw.display import writeFitsImage
 
 try:
     from ginga.misc.log import get_logger
-    from ginga.AstroImage import AstroImage
-    from ginga.util.wcsmod.wcs_astropy import AstropyWCS
+    from ginga.util.io import io_fits
     haveGinga = True
 except ImportError:
     import logging
     logging.getLogger("lsst.afw.display.astrowidgets").warning("Cannot import ginga libraries.")
-
-    class AstropyWCS:
-        def skyToPixel(*args, **kwargs):
-            pass
-
-        def pixelToSky(*args, **kwargs):
-            pass
-
     haveGinga = False
 
 
@@ -191,21 +186,15 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         self._canvas.delete_all_objects()
         self._buffer()
         if haveGinga:
-            Aimage = AstroImage(inherit_primary_header=True)
-            Aimage.set_data(image.getArray())
-
+            with tempfile.NamedTemporaryFile() as fd:
+                writeFitsImage(fd.name, image, wcs, title, metadata=metadata)
+                fd.flush()
+                # Astropy complains a lot about things we do not care about.
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", VerifyWarning)
+                    warnings.simplefilter("ignore", FITSFixedWarning)
+                    Aimage = io_fits.load_file(fd.name)
             self._gingaViewer.set_image(Aimage)
-
-        if wcs is not None:
-            if haveGinga:
-                _wcs = AstropyWCS(self.logger)
-                Aimage.lsst_wcs = WcsAdaptorForGinga(wcs)
-                _wcs.pixtoradec = Aimage.lsst_wcs.pixtoradec
-                _wcs.pixtosystem = Aimage.lsst_wcs.pixtosystem
-                _wcs.radectopix = Aimage.lsst_wcs.radectopix
-
-                Aimage.set_wcs(_wcs)
-                Aimage.wcs.wcs = Aimage.lsst_wcs
 
         if mask:
             maskColorFromName = {'BAD': 'red',
@@ -497,94 +486,3 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             Event with (key, x, y).
         """
         pass
-
-
-# Copy ginga's WCS implementation
-class WcsAdaptorForGinga(AstropyWCS):
-    """A class to adapt the LSST Wcs class for Ginga.
-
-    This was taken largely from the afw.display.ginga package.
-
-    Parameters
-    ----------
-    wcs : `ginga.util.wcsmod.wcs_astropy`
-        WCS to adapt for Ginga.
-    """
-    def __init__(self, wcs):
-        self._wcs = wcs
-
-    def pixtoradec(self, idxs, coords='data'):
-        """Return (ra, dec) in degrees given a position in pixels.
-
-        Parameters
-        ----------
-        idxs : `list` [`tuple` [`float`, `float`]]
-            Pixel locations to convert.
-        coords  : `str`, optional
-            This parameter is ignored.
-        Returns
-        -------
-        ra : `list`
-            RA position in degrees.
-        dec : `list`
-            DEC position in degrees.
-        """
-        ra, dec = self._wcs.pixelToSky(*idxs)
-
-        return ra.asDegrees(), dec.asDegrees()
-
-    def pixtosystem(self, idxs, system=None, coords='data'):
-        """Return (ra, dec) in degrees given a position in pixels.
-
-        Parameters
-        ----------
-        idxs : `list` [`tuple` [`float`, `float`]]
-            Pixel locations to convert.
-        system : `str`, optional
-            This parameter is ignored.
-        coords : `str`, optional
-            This parameter is ignored.
-
-        Returns
-        -------
-        ra : `list`
-            RA position in degrees.
-        dec : `list`
-            DEC position in degrees.
-        """
-        return self.pixtoradec(idxs, coords=coords)
-
-    def radectopix(self, ra_deg, dec_deg, coords='data', naxispath=None):
-        """Return (x, y) in pixels given (ra, dec) in degrees
-
-        Parameters
-        ----------
-        ra_deg : `list` [`float`]
-            RA position in degrees.
-        dec_deg : `list` [`float`]
-            DEC position in degrees.
-        coords : `str`, optional
-            This parameter is ignored.
-        naxispath : `str`, optional
-            This parameter is ignored.
-
-        Returns
-        -------
-        out : `tuple` [`list` [`float, `float`]]
-            Image coordates for input positions.
-        """
-        return self._wcs.skyToPixel(ra_deg*afwGeom.degrees, dec_deg*afwGeom.degrees)
-
-    def all_pix2world(self, *args, **kwargs):
-        out = []
-        print(f"{args}")
-        for pos in args[0]:
-            r, d = self.pixtoradec(pos)
-            out.append([r, d])
-            return tuple(out)
-
-    def datapt_to_wcspt(self, *args):
-        return (0.0, 0.0)
-
-    def wcspt_to_datapt(self, *args):
-        return (0.0, 0.0)
