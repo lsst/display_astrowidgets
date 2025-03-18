@@ -61,7 +61,7 @@ except NameError:
 
 
 def AstroWidgetsVersion():
-    """Get the version of DS9 in use.
+    """Get the version of Astrowidgets in use.
 
     Returns
     -------
