@@ -171,7 +171,7 @@ class DisplayImpl(virtualDevice.DisplayImpl):
         """Return the current mask transparency."""
         return self._maskTransparency
 
-    def _mtv(self, image, mask=None, wcs=None, title=""):
+    def _mtv(self, image, mask=None, wcs=None, title="", metadata=None):
         """Display an Image and/or Mask on a ginga display
 
         Parameters
@@ -184,6 +184,8 @@ class DisplayImpl(virtualDevice.DisplayImpl):
             WCS to use, if the input does not contain one.
         title : `str`, optional
             Unsupported display title.
+        metadata : `lsst.daf.base.PropertyList`, optional
+            Unsupported FITS header information.
         """
         self._erase()
         self._canvas.delete_all_objects()
